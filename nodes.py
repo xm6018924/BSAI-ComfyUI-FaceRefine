@@ -515,6 +515,25 @@ class BSAIFaceRefine:
                 % (pass_idx + 1, len(refs), cw, ch, K, (track_report or "")[:400])
             )
 
+            # ---- 1.4 自动近景脸参考（从远走到近：取最清晰大帧脸作 ref2v 锚点） ----
+            # 远景小脸无参考图时，H3 ref2v 凭空生成会发散成彩色噪点。若视频里同一人
+            # 走近后脸变大，自动选"脸最大"的那一帧裁出头部，作为 ref2v 的参考锚点，
+            # 远景帧便有清晰大脸可依，不再瞎生成。用户手动接了 identity_ref 则不启用。
+            auto_ref = None
+            if ref is None:
+                try:
+                    _boxes = transform["boxes"]  # [(x,y,bw,bh)] 原坐标
+                    if _boxes:
+                        _bk = max(range(len(_boxes)), key=lambda k: _boxes[k][3])
+                        _face_h_big = _boxes[_bk][3] / max(crop_factor, 1.0)
+                        if _face_h_big >= 60.0:
+                            auto_ref = crops[_bk:_bk + 1]
+                            reports.append(
+                                "[自动近景参考] 检测到近景大脸约 %.0fpx（裁剪帧 #%d），"
+                                "自动裁出作 ref2v 锚点，远景小脸不再凭空生成。" % (_face_h_big, _bk))
+                except Exception as _e:
+                    print("[BSAIFaceRefine-v5] auto near-shot ref skipped:", _e)
+
             # ---- 1.5 远景小脸自动降倍（防止 H3 放大过度导致结构崩坏） ----------
             # 源脸高 < 40px 且画布 > 512 时：9-13x 放大后 H3 无法从模糊裁剪合成完整脸，
             # 表现为"独眼/五官错位"。自动改用 512 画布 + crop_factor 3.5 降倍重裁，
@@ -547,9 +566,10 @@ class BSAIFaceRefine:
                 reports.append("[小脸模式] 小脸 denoise→0.18（23px 级糊脸只增强不重生成）：防 H3 发散成噪点。")
 
             # ---- 2. conditioning（可选身份参考注入） ---------------------------
+            use_ref = ref if ref is not None else auto_ref
             ref_images = None
-            if ref is not None:
-                ref_images = {"ref_image_1": ref}
+            if use_ref is not None:
+                ref_images = {"ref_image_1": use_ref}
             cond_len = _align_h3_len(int(K))
             res = MiniMaxH3ReferenceToVideo.execute(
                 clip=clip,
