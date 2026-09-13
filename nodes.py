@@ -526,7 +526,7 @@ class BSAIFaceRefine:
                     if _boxes:
                         _bk = max(range(len(_boxes)), key=lambda k: _boxes[k][3])
                         _face_h_big = _boxes[_bk][3] / max(crop_factor, 1.0)
-                        if _face_h_big >= 60.0:
+                        if _face_h_big >= 30.0:
                             auto_ref = crops[_bk:_bk + 1]
                             reports.append(
                                 "[自动近景参考] 检测到近景大脸约 %.0fpx（裁剪帧 #%d），"
@@ -562,8 +562,8 @@ class BSAIFaceRefine:
                 # 自由重生成近半内容、在无参考图时发散成彩色噪点。压到 0.18：只做锐化/
                 # 纹理增强，保留原糊脸结构，杜绝噪点。脸稍大（40~120px）走正常 0.35。
                 _small_face_mode = True
-                _eff_small_denoise = 0.18
-                reports.append("[小脸模式] 小脸 denoise→0.18（23px 级糊脸只增强不重生成）：防 H3 发散成噪点。")
+                _eff_small_denoise = 0.35
+                reports.append("[小脸模式] 小脸 denoise 0.35（配合自动近景参考锚点，正常重绘防噪点）。")
 
             # ---- 2. conditioning（可选身份参考注入） ---------------------------
             use_ref = ref if ref is not None else auto_ref
