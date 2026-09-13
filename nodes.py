@@ -381,10 +381,10 @@ class BSAIFaceRefine:
                 "stage2_temporal": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05,
                                               "tooltip": "人脸时域稳定（仅 CodeFormer 引擎使用）"}),
                 "undetected_frames": (["fade_out", "skip", "composite_anyway"], {"default": "fade_out"}),
-                "person_fallback": ("BOOLEAN", {"default": True,
-                    "tooltip": "远景小脸兜底（视频核心技巧）：人脸检测器丢帧（侧脸/远到漏检）时，"
-                               "自动用 person 全身分割模型从人体框顶部反推头部位置，而不是在前后帧间盲目插值。"
-                               "需 models/ultralytics/segm 下有 person_yolov8m-seg.pt。建议常开。"}),
+                "person_fallback": ("BOOLEAN", {"default": False,
+                    "tooltip": "远景小脸兜底：仅当人脸检测器在某些帧彻底丢帧时，用 person 全身分割模型"
+                               "从人体框顶部反推头部。注意：它会参与轨迹平滑，中景/夜景镜头若估算偏低会把裁剪框拉偏到脖子导致噪点。"
+                               "建议默认关；只在确认纯远景小脸、且远景帧脸框频繁丢失时手动开。需 models/ultralytics/segm/person_yolov8m-seg.pt。"}),
             },
         }
 
@@ -434,7 +434,7 @@ class BSAIFaceRefine:
         stage2_blend=0.7,
         stage2_temporal=0.5,
         undetected_frames="fade_out",
-        person_fallback=True,
+        person_fallback=False,
     ):
         hfr = _get_hfr()
         H3FaceTrackCrop = hfr["H3FaceTrackCrop"]

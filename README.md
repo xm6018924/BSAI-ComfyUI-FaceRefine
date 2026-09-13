@@ -81,7 +81,7 @@ H3 Loader (model+CLIP+VAE+audioVAE) ─┘
 | `canvas_size` | 768 | 裁剪画布；远景建议 512 |
 | `confidence` | 0.35 | 检测置信度 |
 | `crop_factor` | 2.5 | 人脸外扩倍数；远景建议 3.5 |
-| `person_fallback` | **True** | **远景小脸兜底**：人脸丢帧时用 person 全身模型定位头部。建议常开 |
+| `person_fallback` | **False** | 远景丢帧兜底，默认关。仅纯远景小脸且脸框频繁丢失时手动开；中景/夜景开了会把裁剪框拉偏导致噪点 |
 | `scheduler` / `sampler_name` | beta / euler | 与官方人脸工作流一致 |
 | `identity_ref_1..4` | 空 | 多人身份参考图（正面清晰单人照） |
 | `stage2_enable` | False | 第二阶段细节增强（VOSR / CodeFormer 等，可选） |

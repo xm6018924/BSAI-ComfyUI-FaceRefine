@@ -362,7 +362,7 @@
         0.7,
         0.5,
         "fade_out",
-        true
+        false
       ],
       "widgets_values_named": {
         "detector": "bbox\\face_yolov8m.pt",
@@ -394,7 +394,7 @@
         "stage2_blend": 0.5,
         "stage2_temporal": "fade_out",
         "undetected_frames": "fade_out",
-        "person_fallback": true
+        "person_fallback": false
       }
     },
     {
