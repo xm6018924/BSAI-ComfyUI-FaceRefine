@@ -1,0 +1,590 @@
+{
+  "id": "BSAI_Face_Refine_longshot",
+  "revision": 0,
+  "last_node_id": 8,
+  "last_link_id": 9,
+  "nodes": [
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        -1569.9794411177638,
+        -70.79750499001905
+      ],
+      "size": [
+        330,
+        106
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "slot_index": 0,
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.35.0",
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        "minimax",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    {
+      "id": 7,
+      "type": "VHS_VideoCombine",
+      "pos": [
+        -600,
+        -200
+      ],
+      "size": [
+        390,
+        334
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "name": "meta_batch",
+          "shape": 7,
+          "type": "VHS_BatchManager",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Filenames",
+          "type": "VHS_FILENAMES",
+          "slot_index": 0,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-videohelpersuite",
+        "ver": "4d907bee61e92c2e65af3bd6383a4e4d356126d1",
+        "Node name for S&R": "VHS_VideoCombine"
+      },
+      "widgets_values": {
+        "frame_rate": 24,
+        "loop_count": 0,
+        "filename_prefix": "video/BSAI_FaceRefined",
+        "format": "video/h264-mp4",
+        "pix_fmt": "yuv420p",
+        "crf": 16,
+        "save_metadata": true,
+        "trim_to_audio": false,
+        "pingpong": false,
+        "save_output": true,
+        "videopreview": ""
+      },
+      "widgets_values_named": {
+        "frame_rate": 24,
+        "loop_count": 0,
+        "filename_prefix": "video/BSAI_FaceRefined",
+        "format": "video/h264-mp4",
+        "pix_fmt": "yuv420p",
+        "crf": 16,
+        "save_metadata": true,
+        "trim_to_audio": false,
+        "pingpong": false,
+        "save_output": true,
+        "videopreview": ""
+      }
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        -1569.9794411177638,
+        89.20249500998084
+      ],
+      "size": [
+        330,
+        60
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "slot_index": 0,
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.35.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "minimax_h3_video_vae_int8_convrot.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+      }
+    },
+    {
+      "id": 5,
+      "type": "VAELoader",
+      "pos": [
+        -1569.9794411177638,
+        219.20249500998082
+      ],
+      "size": [
+        330,
+        60
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "slot_index": 0,
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.35.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "minimax_h3_audio_vae_fp32.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+      }
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        -1569.9794411177638,
+        -200.7975049900191
+      ],
+      "size": [
+        330,
+        82
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.35.0",
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 6,
+      "type": "BSAIFaceRefine",
+      "pos": [
+        -1150,
+        -200
+      ],
+      "size": [
+        400,
+        940
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 5
+        },
+        {
+          "name": "audio_vae",
+          "type": "VAE",
+          "link": 6
+        },
+        {
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 9
+        },
+        {
+          "name": "identity_ref_1",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "identity_ref_2",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "identity_ref_3",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "identity_ref_4",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": null
+        },
+        {
+          "name": "face_count",
+          "type": "INT",
+          "slot_index": 2,
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BSAIFaceRefine"
+      },
+      "widgets_values": [
+        "bbox\\face_yolov8m.pt",
+        8,
+        0.35,
+        512,
+        0.4,
+        0.35,
+        3.5,
+        21,
+        "beta",
+        "euler",
+        0,
+        "ultra high definition close-up of a human face, crystal clear facial details, natural realistic skin texture, sharp detailed eyes, correct natural facial features, photorealistic, professional portrait quality",
+        true,
+        0.28,
+        "face_only",
+        24,
+        24,
+        1.0,
+        1.0,
+        false,
+        "1xSkinContrast (皮肤细节·极速)",
+        2.0,
+        0.5,
+        1,
+        0.6,
+        0.7,
+        0.5,
+        "fade_out",
+        true
+      ],
+      "widgets_values_named": {
+        "detector": "bbox\\face_yolov8m.pt",
+        "steps": 8,
+        "denoise": 0.35,
+        "canvas_size": 512,
+        "small_face_denoise": 0.4,
+        "confidence": 0.35,
+        "crop_factor": 3.5,
+        "smooth_window": 21,
+        "scheduler": "beta",
+        "sampler_name": "euler",
+        "seed": 0,
+        "control_after_generate": "ultra high definition close-up of a human face, crystal clear facial details, natural realistic skin texture, sharp detailed eyes, correct natural facial features, photorealistic, professional portrait quality",
+        "prompt": true,
+        "enable_audio_lock": 0.28,
+        "identity_threshold": "face_only",
+        "paste_region": 16,
+        "mask_dilation": 24,
+        "feather": 24,
+        "colour_match": 1,
+        "blend": false,
+        "stage2_enable": "1xSkinContrast (皮肤细节·极速)",
+        "stage2_engine": 2,
+        "stage2_scale": 0.5,
+        "stage2_cfg": 1,
+        "stage2_steps": 0.6,
+        "stage2_fidelity": 0.7,
+        "stage2_blend": 0.5,
+        "stage2_temporal": "fade_out",
+        "undetected_frames": "fade_out",
+        "person_fallback": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "VHS_LoadVideo",
+      "pos": [
+        -1915.136589153999,
+        -194.43417516162347
+      ],
+      "size": [
+        261.6533203125,
+        460.08634187370603
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "meta_batch",
+          "shape": 7,
+          "type": "VHS_BatchManager",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "frame_count",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "video_info",
+          "type": "VHS_VIDEOINFO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-videohelpersuite",
+        "ver": "4d907bee61e92c2e65af3bd6383a4e4d356126d1",
+        "Node name for S&R": "VHS_LoadVideo"
+      },
+      "widgets_values": {
+        "video": "2de556273db08f2adab69e57e7c992ce.mp4",
+        "force_rate": 0,
+        "custom_width": 0,
+        "custom_height": 0,
+        "frame_load_cap": 0,
+        "skip_first_frames": 0,
+        "select_every_nth": 1,
+        "format": "AnimateDiff",
+        "choose video to upload": "image",
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "2de556273db08f2adab69e57e7c992ce.mp4",
+            "type": "input",
+            "format": "video/mp4",
+            "force_rate": 0,
+            "custom_width": 0,
+            "custom_height": 0,
+            "frame_load_cap": 0,
+            "skip_first_frames": 0,
+            "select_every_nth": 1
+          }
+        }
+      },
+      "widgets_values_named": {
+        "video": "2de556273db08f2adab69e57e7c992ce.mp4",
+        "force_rate": 0,
+        "custom_width": 0,
+        "custom_height": 0,
+        "frame_load_cap": 0,
+        "skip_first_frames": 0,
+        "select_every_nth": 1,
+        "format": "AnimateDiff",
+        "choose video to upload": "image",
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "2de556273db08f2adab69e57e7c992ce.mp4",
+            "type": "input",
+            "format": "video/mp4",
+            "force_rate": 0,
+            "custom_width": 0,
+            "custom_height": 0,
+            "frame_load_cap": 0,
+            "skip_first_frames": 0,
+            "select_every_nth": 1
+          }
+        }
+      }
+    }
+  ],
+  "links": [
+    [
+      3,
+      2,
+      0,
+      6,
+      1,
+      "MODEL"
+    ],
+    [
+      4,
+      3,
+      0,
+      6,
+      2,
+      "CLIP"
+    ],
+    [
+      5,
+      4,
+      0,
+      6,
+      3,
+      "VAE"
+    ],
+    [
+      6,
+      5,
+      0,
+      6,
+      4,
+      "VAE"
+    ],
+    [
+      7,
+      6,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      8,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      8,
+      2,
+      6,
+      5,
+      "AUDIO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.2982550442477905,
+      "offset": [
+        1991.340492473339,
+        362.93942574993304
+      ]
+    },
+    "qgn_navigation_groups": [],
+    "qgn_locked": false,
+    "frontendVersion": "1.51.10",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
