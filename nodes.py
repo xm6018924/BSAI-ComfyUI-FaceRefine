@@ -539,11 +539,12 @@ class BSAIFaceRefine:
                 canvas_size = 512
                 _mag_new = 512.0 / (min_face * 3.5)
                 reports.append("[小脸模式] 重裁完成：画布 512x512，放大 %.1fx，帧数 %d。" % (_mag_new, K))
-                # 视频作者实测 denoise 0.35-0.45 区间人脸细化最自然；小脸原 0.7 仍偏高，
-                # 易把模糊小脸脑补成"塑料感/错位五官"。降到 0.4 做增强式重绘，保留原脸结构。
+                # 源脸仅 23~33px 时，放大 5~6 倍后几乎无五官信息。denoise 0.4 会让 H3
+                # 自由重生成近半内容、在无参考图时发散成彩色噪点。压到 0.18：只做锐化/
+                # 纹理增强，保留原糊脸结构，杜绝噪点。脸稍大（40~120px）走正常 0.35。
                 _small_face_mode = True
-                _eff_small_denoise = 0.4
-                reports.append("[小脸模式] 小脸 denoise 1.0→0.4（视频推荐 0.35~0.45）：增强式重绘，防脑补糊脸。")
+                _eff_small_denoise = 0.18
+                reports.append("[小脸模式] 小脸 denoise→0.18（23px 级糊脸只增强不重生成）：防 H3 发散成噪点。")
 
             # ---- 2. conditioning（可选身份参考注入） ---------------------------
             ref_images = None
