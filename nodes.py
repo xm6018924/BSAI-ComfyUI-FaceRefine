@@ -37,7 +37,7 @@ import importlib.util
 # ---------------------------------------------------------------------------
 
 _CANDIDATE_SUBSTRINGS = {
-    "h3fr": ("h3-facerefine", "h3facerefine", "facerefine"),
+    "h3fr": ("h3-facerefine", "h3facerefine"),
     "nal": ("nativelock", "native_audio", "h3-nativeaudio"),
     "bsai4k": ("bsai-h3-upscale-4k", "h3-upscale-4k", "upscale_4k", "bsai_h3_upscale"),
 }
@@ -68,24 +68,14 @@ _HFR_MOD = None
 
 
 def _get_hfr():
-    """返回 H3FaceRefine 的 NODE_CLASS_MAPPINGS。"""
+    """返回 H3FaceRefine 的 NODE_CLASS_MAPPINGS（已内嵌为本插件的 h3_facerefine.py）。"""
     global _HFR_MAPPINGS, _HFR_MOD
     if _HFR_MAPPINGS is not None:
         return _HFR_MAPPINGS
-
-    mod = _find_loaded_module(*_CANDIDATE_SUBSTRINGS["h3fr"])
-    if mod is None or not hasattr(mod, "NODE_CLASS_MAPPINGS"):
-        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        path = os.path.join(base, "ComfyUI-H3-FaceRefine", "nodes.py")
-        if os.path.isfile(path):
-            mod = _load_file_module(path, "bsai_h3fr_nodes")
-    if mod is None or not hasattr(mod, "NODE_CLASS_MAPPINGS"):
-        raise RuntimeError(
-            "BSAI Face Refine: 找不到 ComfyUI-H3-FaceRefine 节点集。"
-            "请确认该插件已安装在 custom_nodes 下。"
-        )
-    _HFR_MOD = mod
-    _HFR_MAPPINGS = mod.NODE_CLASS_MAPPINGS
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, "h3_facerefine.py")
+    _HFR_MOD = _load_file_module(path, "bsai_h3_facerefine")
+    _HFR_MAPPINGS = _HFR_MOD.NODE_CLASS_MAPPINGS
     return _HFR_MAPPINGS
 
 
@@ -319,6 +309,65 @@ def _find_person_detector():
     return None
 
 
+# ---------------------------------------------------------------------------
+# VRAM 智能管理：采样前给 RTX 5090 减负，避免 offload 抖动
+# ---------------------------------------------------------------------------
+
+def _vram_stats():
+    """返回 (used_mb, free_mb, total_mb, used_ratio)。"""
+    try:
+        import torch
+        free, total = torch.cuda.mem_get_info()
+        used = total - free
+        return used / 1048576, free / 1048576, total / 1048576, used / total
+    except Exception:
+        return 0.0, 0.0, 0.0, 0.0
+
+
+def _unload_model_patcher(patcher):
+    """把单个模型的 ModelPatcher 从显存卸载（clip / vae 用后即弃）。"""
+    if patcher is None:
+        return
+    try:
+        import comfy.model_management as mm
+        for m in list(mm.current_loaded_models):
+            if m.model is patcher:
+                m.currently_used = False
+                m.model_unload()
+                break
+    except Exception as e:
+        print("[BSAIFaceRefine] unload patcher warn:", e)
+
+
+def _unload_clip(clip):
+    try:
+        _unload_model_patcher(clip.patcher)
+    except Exception:
+        pass
+
+
+def _unload_vae(vae):
+    try:
+        _unload_model_patcher(vae.patcher)
+    except Exception:
+        pass
+
+
+def _soft_empty_cache():
+    try:
+        import comfy.model_management as mm
+        mm.soft_empty_cache(force=True)
+    except Exception:
+        pass
+
+
+def _vram_budget_report(tag, used, free, total, ratio):
+    print(
+        "[BSAIFaceRefine] %s | VRAM used=%.0fMB free=%.0fMB total=%.0fMB (%.0f%%)"
+        % (tag, used, free, total, ratio * 100)
+    )
+
+
 class BSAIFaceRefine:
     """BSAI Face Refine —— 一键人脸高清修复（单人 / 多人自动）"""
 
@@ -331,7 +380,7 @@ class BSAIFaceRefine:
                 "clip": ("CLIP", {"tooltip": "H3 文本编码器（Qwen3VL-MiniMax-H3）"}),
                 "vae": ("VAE", {"tooltip": "H3 视频 VAE"}),
                 "audio_vae": ("VAE", {"tooltip": "H3 音频 VAE（启用音频锁定时必需）"}),
-                "detector": (_detector_choices(), {"tooltip": "人脸检测模型（models/ultralytics/bbox 下）"}),
+                "detector": ("STRING", {"default": "bbox\\face_yolov8m.pt", "tooltip": "人脸检测模型（models/ultralytics/bbox 下）"}),
                 "steps": ("INT", {"default": 8, "min": 1, "max": 32, "step": 1, "tooltip": "H3 重绘采样步数（参考工作流 8 步）"}),
                 "denoise": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.0, "step": 0.05,
                                       "tooltip": "人脸重绘强度（作用于大脸帧）。小脸帧自动用全强度（参考工作流语义：大脸 0.35、小脸 1.0）。崩坏严重可到 0.5~0.55"}),
@@ -385,6 +434,8 @@ class BSAIFaceRefine:
                     "tooltip": "远景小脸兜底：仅当人脸检测器在某些帧彻底丢帧时，用 person 全身分割模型"
                                "从人体框顶部反推头部。注意：它会参与轨迹平滑，中景/夜景镜头若估算偏低会把裁剪框拉偏到脖子导致噪点。"
                                "建议默认关；只在确认纯远景小脸、且远景帧脸框频繁丢失时手动开。需 models/ultralytics/segm/person_yolov8m-seg.pt。"}),
+                "use_npu_face_detect": ("BOOLEAN", {"default": True,
+                    "tooltip": "启用 NPU 人脸检测：自动启动 NPU 服务(8191)，人脸检测/关键点/年龄识别跑在 Intel AI Boost NPU 上，不占 GPU"}),
             },
         }
 
@@ -435,8 +486,28 @@ class BSAIFaceRefine:
         stage2_temporal=0.5,
         undetected_frames="fade_out",
         person_fallback=False,
+        use_npu_face_detect=True,
     ):
+        # ---- NPU 人脸检测（自动：BSAI-NPU-Service 插件同进程加载，零配置） ----
+        npu_status = "disabled"
+        if use_npu_face_detect:
+            try:
+                import importlib
+                _npu_mod = importlib.import_module("custom_nodes.BSAI-NPU-Service")
+                _npu_svc = getattr(_npu_mod, "_svc", None)
+                if _npu_svc is not None:
+                    npu_status = "online (device=%s)" % getattr(_npu_svc, "device", "?")
+                    print("[BSAIFaceRefine] NPU face detect: %s" % npu_status)
+                else:
+                    npu_status = "service not ready"
+            except Exception as e:
+                npu_status = "NPU service plugin not loaded: %s" % e
+                print("[BSAIFaceRefine] %s" % npu_status)
+
         hfr = _get_hfr()
+        _HFR_MOD._NPU_FACE_DETECT = bool(use_npu_face_detect)
+        if use_npu_face_detect:
+            print("[BSAIFaceRefine] NPU face detect ENABLED")
         H3FaceTrackCrop = hfr["H3FaceTrackCrop"]
         H3FaceStitch = hfr["H3FaceStitch"]
         H3InjectVideoLatent = hfr["H3InjectVideoLatent"]
@@ -460,6 +531,18 @@ class BSAIFaceRefine:
         base = images
         reports = []
         face_count = 0
+
+        # ---- VRAM 预检：5090 显存紧张时自动降画布，避免采样 OOM ----
+        _used_mb, _free_mb, _total_mb, _ratio = _vram_stats()
+        _vram_budget_report("进入节点", _used_mb, _free_mb, _total_mb, _ratio)
+        if _free_mb < 2500 and canvas_size > 512:
+            _old_canvas = canvas_size
+            canvas_size = max(512, int(canvas_size - 128))
+            reports.append(
+                "[显存自动降档] 进入时仅剩 %.0fMB 显存，画布 %d -> %d，避免采样 OOM。"
+                % (_free_mb, _old_canvas, canvas_size)
+            )
+            print("[BSAIFaceRefine] VRAM 紧张自动降画布: %d -> %d" % (_old_canvas, canvas_size))
 
         # ---- 远景小脸兜底：person 全身模型 fallback_detector -------------------
         # 视频（Benji's AI Playground）核心结论：远景镜头人脸小到看不清时，人脸检测器
@@ -584,6 +667,10 @@ class BSAIFaceRefine:
             )
             cond, av_latent = res.result
 
+            # ---- 2.5 VRAM：文本编码器用完即弃（Qwen3VL-32B ~7GB 不再驻留显存）----
+            _unload_clip(clip)
+            _soft_empty_cache()
+
             # ---- 3. 注入真实裁剪帧（img2img 起点） ------------------------------
             latent, inject_report = H3InjectVideoLatent().run(av_latent, crops, vae)
             reports.append("  inject: %s" % (inject_report or "")[:300])
@@ -612,6 +699,17 @@ class BSAIFaceRefine:
             reports.append("  per-frame denoise: %s" % (pf_report or "")[:200])
 
             # ---- 6. 采样（SamplerCustomAdvanced 链路） --------------------------
+            # ---- 5.5 VRAM：采样前给 5090 减负（卸载 video/audio VAE + 清缓存）----
+            _unload_vae(vae)
+            _unload_vae(audio_vae)
+            _soft_empty_cache()
+            _used_mb, _free_mb, _total_mb, _ratio = _vram_stats()
+            _vram_budget_report("采样前", _used_mb, _free_mb, _total_mb, _ratio)
+            if _free_mb < 1500:
+                reports.append(
+                    "[显存提示] 采样前仅剩 %.0fMB 显存，若采样报 OOM 请降低 canvas_size 或关闭其他驻留模型。"
+                    % _free_mb
+                )
             sigmas = BasicScheduler.execute(patched_model, scheduler, steps, 1.0).result[0]
             sampler = KSamplerSelect.execute(sampler_name).result[0]
             guider = BasicGuider.execute(patched_model, cond).result[0]
@@ -659,9 +757,17 @@ class BSAIFaceRefine:
             )
             reports.append("[pass %d] 缝合完成。" % (pass_idx + 1))
 
+        # ---- VRAM 收尾：卸载 VAE + 清缓存，释放给后续节点 ----
+        _unload_vae(vae)
+        _unload_vae(audio_vae)
+        _soft_empty_cache()
+        _used_mb, _free_mb, _total_mb, _ratio = _vram_stats()
+        _vram_budget_report("节点结束", _used_mb, _free_mb, _total_mb, _ratio)
+
         full_report = "\n".join(reports)
         if not reports:
             full_report = "未检测到任何可修复的人脸。"
+        full_report = "[NPU] %s\n%s" % (npu_status, full_report)
         return (base, full_report, face_count)
 
 
