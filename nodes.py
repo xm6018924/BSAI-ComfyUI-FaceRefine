@@ -32,6 +32,32 @@ import sys
 import importlib.util
 
 # ---------------------------------------------------------------------------
+# BSAI 插件协同 SDK：加载即自动注册（ComfyUI 启动自动触发；失败不拖垮本插件）
+# ---------------------------------------------------------------------------
+_ORCH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                     "..", "BSAI-ComfyUI-Orchestrator")
+if not os.path.isdir(_ORCH):
+    _ORCH = r"G:\BSAI-ComfyUI-intel-XPU-GPU-NPU-aki\ComfyUI\custom_nodes\BSAI-ComfyUI-Orchestrator"
+if os.path.isdir(_ORCH) and _ORCH not in sys.path:
+    sys.path.insert(0, _ORCH)
+try:
+    from bsai_orch_client import BSAIOrch
+except Exception:
+    BSAIOrch = None
+
+try:
+    if BSAIOrch is not None:
+        BSAIOrch.register(
+            name="BSAI-FaceRefine",
+            kind="face_detect",                       # 能力类型：人脸检测（NPU）
+            hardware=["npu", "cuda"],                 # 偏好：NPU(8191) -> GPU 兜底
+            endpoint="http://127.0.0.1:8191/detect_face",
+            health="http://127.0.0.1:8191/health/ready",
+        )
+except Exception:
+    pass
+
+# ---------------------------------------------------------------------------
 # 兼容加载：本机已安装的官方 H3 插件模块（目录名含连字符，无法直接 import）
 # 优先复用 ComfyUI 已加载的模块实例，保证与界面注册的是同一份节点类。
 # ---------------------------------------------------------------------------
@@ -567,27 +593,41 @@ class BSAIFaceRefine:
             _eff_small_denoise = small_face_denoise
             # ---- 1. 检测 + 逐帧裁剪 + 身份跟踪 --------------------------------
             track = H3FaceTrackCrop()
-            crops, transform, preview, track_report, cw, ch, K = track.run(
-                images=base,
-                detector=detector,
-                confidence=confidence,
-                crop_factor=crop_factor,
-                canvas_width=canvas_size,
-                canvas_height=canvas_size,
-                canvas_mode="manual",
-                smooth_window=smooth_window,
-                size_smooth_window=51,
-                smooth_method="gaussian",
-                size_mode="per_frame",
-                select="largest_face",
-                identity_reference=ref,
-                identity_threshold=identity_threshold,
-                identity_track=True,
-                identity_model="insightface",
-                cut_detection="none",
-                fallback_detector=fb_detector,
-                fallback_head_frac=0.5,
-            )
+            # BSAI 协同：人脸检测期间持有 NPU 租约（allocate 失败/未注册均不改变原流程）
+            _fd_alloc = None
+            try:
+                if BSAIOrch is not None:
+                    _fd_alloc = BSAIOrch.allocate("face_detect", requester="8191", watchdog=True)
+            except Exception:
+                _fd_alloc = None
+            try:
+                crops, transform, preview, track_report, cw, ch, K = track.run(
+                    images=base,
+                    detector=detector,
+                    confidence=confidence,
+                    crop_factor=crop_factor,
+                    canvas_width=canvas_size,
+                    canvas_height=canvas_size,
+                    canvas_mode="manual",
+                    smooth_window=smooth_window,
+                    size_smooth_window=51,
+                    smooth_method="gaussian",
+                    size_mode="per_frame",
+                    select="largest_face",
+                    identity_reference=ref,
+                    identity_threshold=identity_threshold,
+                    identity_track=True,
+                    identity_model="insightface",
+                    cut_detection="none",
+                    fallback_detector=fb_detector,
+                    fallback_head_frac=0.5,
+                )
+            finally:
+                if _fd_alloc is not None:
+                    try:
+                        _fd_alloc.release()
+                    except Exception:
+                        pass
             if crops is None:
                 reports.append("[pass %d] 未检测到人脸，跳过。" % (pass_idx + 1))
                 continue
