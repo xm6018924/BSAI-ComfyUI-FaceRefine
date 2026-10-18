@@ -192,10 +192,10 @@ _STAGE2_ENGINES = [
 _STAGE2_ENGINE_MODEL = {
     "1xSkinContrast (skin detail, fastest)": "1xSkinContrast-SuperUltraCompact.pth",
     "RealESRGAN_x2plus (general 2x, fast)": "RealESRGAN_x2plus.pth",
-    "DLSS 5 (RTX hardware-accelerated, fast)": "DLSS 5 (NVIDIA 神经渲染超分)",
-    "FlashVSR (diffusion video upscale, fast)": "FlashVSR-v1.1 (扩散视频超分)",
-    "SeedVR2 7B INT8 (high quality, medium)": "SeedVR2 7B INT8 (ComfyUI原生)",
-    "VOSR 2.0 (CVPR2026 generative upscale)": "VOSR 2.0 (CVPR2026生成式超分)",
+    "DLSS 5 (RTX hardware-accelerated, fast)": "DLSS 5 (NVIDIA neural SR)",
+    "FlashVSR (diffusion video upscale, fast)": "FlashVSR-v1.1 (diffusion video SR)",
+    "SeedVR2 7B INT8 (high quality, medium)": "SeedVR2 7B INT8 (native ComfyUI)",
+    "VOSR 2.0 (CVPR2026 generative upscale)": "VOSR 2.0 (CVPR2026 generative SR)",
 }
 
 _FACE_RESTORE_ENGINES = ("CodeFormer", "GFPGANv1.4", "Face enhance (CodeFormer)")
@@ -245,7 +245,7 @@ def _stage2_enhance(crops, engine, scale, cfg, steps, fidelity, blend, temporal)
         scale = max(1.0, float(scale))
         out, w, h, eff, info = node.upscale(**{
             "images / 图像": crops,
-            "model_name / 模型": "VOSR 2.0 (CVPR2026生成式超分)",
+            "model_name / 模型": "VOSR 2.0 (CVPR2026 generative SR)",
             "scale / 放大倍数": scale,
             "vosr_cfg / VOSR保真度": float(cfg),
             "vosr_steps / VOSR步数": int(steps),
