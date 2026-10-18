@@ -138,7 +138,7 @@ def _import_custom_sampler():
         from comfy_extras import nodes_custom_sampler as m
         return m
     except Exception as e:
-        raise RuntimeError("BSAI Face Refine: 无法导入 comfy_extras.nodes_custom_sampler: %s" % e)
+        raise RuntimeError("BSAI Face Refine: failed to import comfy_extras.nodes_custom_sampler: %s" % e)
 
 
 def _import_minimax_h3():
@@ -146,7 +146,7 @@ def _import_minimax_h3():
         from comfy_extras import nodes_minimax_h3 as m
         return m
     except Exception as e:
-        raise RuntimeError("BSAI Face Refine: 无法导入 comfy_extras.nodes_minimax_h3: %s" % e)
+        raise RuntimeError("BSAI Face Refine: failed to import comfy_extras.nodes_minimax_h3: %s" % e)
 
 
 # ---------------------------------------------------------------------------
@@ -173,31 +173,32 @@ def _align_h3_len(n):
 # ---------------------------------------------------------------------------
 
 _STAGE2_ENGINES = [
-    # ---- 快速档（推荐日常使用）----
-    "1xSkinContrast (皮肤细节·极速)",
-    "RealESRGAN_x2plus (通用2倍·快速)",
-    "DLSS 5 (RTX硬件加速·快速)",
-    "FlashVSR (扩散视频超分·快速)",
-    "SeedVR2 7B INT8 (高质量·中速)",
-    # ---- 极致档 ----
-    "VOSR 2.0 (CVPR2026生成式超分)",
-    # ---- 人脸重建档 ----
+    # ---- fast tier (recommended for daily use) ----
+    "1xSkinContrast (skin detail, fastest)",
+    "RealESRGAN_x2plus (general 2x, fast)",
+    "DLSS 5 (RTX hardware-accelerated, fast)",
+    "FlashVSR (diffusion video upscale, fast)",
+    "SeedVR2 7B INT8 (high quality, medium)",
+    # ---- extreme tier ----
+    "VOSR 2.0 (CVPR2026 generative upscale)",
+    # ---- face restoration tier ----
     "CodeFormer",
     "GFPGANv1.4",
-    "小脸增强(CodeFormer)",
+    "Face enhance (CodeFormer)",
 ]
 
-# 引擎显示名 -> BSAI-H3-upscale-4K 的 model_name（ENGINE_OPTIONS 键或模型文件名）
+# Engine display name -> BSAI-H3-upscale-4K model_name (ENGINE_OPTIONS key or model filename).
+# The mapped values below are the *other plugin's* model identifiers and are kept verbatim.
 _STAGE2_ENGINE_MODEL = {
-    "1xSkinContrast (皮肤细节·极速)": "1xSkinContrast-SuperUltraCompact.pth",
-    "RealESRGAN_x2plus (通用2倍·快速)": "RealESRGAN_x2plus.pth",
-    "DLSS 5 (RTX硬件加速·快速)": "DLSS 5 (NVIDIA 神经渲染超分)",
-    "FlashVSR (扩散视频超分·快速)": "FlashVSR-v1.1 (扩散视频超分)",
-    "SeedVR2 7B INT8 (高质量·中速)": "SeedVR2 7B INT8 (ComfyUI原生)",
-    "VOSR 2.0 (CVPR2026生成式超分)": "VOSR 2.0 (CVPR2026生成式超分)",
+    "1xSkinContrast (skin detail, fastest)": "1xSkinContrast-SuperUltraCompact.pth",
+    "RealESRGAN_x2plus (general 2x, fast)": "RealESRGAN_x2plus.pth",
+    "DLSS 5 (RTX hardware-accelerated, fast)": "DLSS 5 (NVIDIA 神经渲染超分)",
+    "FlashVSR (diffusion video upscale, fast)": "FlashVSR-v1.1 (扩散视频超分)",
+    "SeedVR2 7B INT8 (high quality, medium)": "SeedVR2 7B INT8 (ComfyUI原生)",
+    "VOSR 2.0 (CVPR2026 generative upscale)": "VOSR 2.0 (CVPR2026生成式超分)",
 }
 
-_FACE_RESTORE_ENGINES = ("CodeFormer", "GFPGANv1.4", "小脸增强(CodeFormer)")
+_FACE_RESTORE_ENGINES = ("CodeFormer", "GFPGANv1.4", "Face enhance (CodeFormer)")
 
 
 _BSAI4K_MOD = None
@@ -220,10 +221,10 @@ def _get_bsai_4k():
                 _BSAI4K_MOD = _load_file_module(path, "bsai_h3_upscale_4k_shared")
                 return _BSAI4K_MOD
             except Exception as e:
-                raise RuntimeError("BSAI Face Refine: BSAI-H3-upscale-4K 加载失败: %s" % e)
+                raise RuntimeError("BSAI Face Refine: failed to load BSAI-H3-upscale-4K: %s" % e)
     raise RuntimeError(
-        "BSAI Face Refine: 未找到 BSAI-H3-upscale-4K 插件（第二阶段 VOSR/CodeFormer 引擎）。"
-        "请确认 custom_nodes\\BSAI-H3-upscale-4K 已安装。"
+        "BSAI Face Refine: BSAI-H3-upscale-4K plugin not found (needed for stage-2 VOSR/CodeFormer engines). "
+        "Make sure custom_nodes\\BSAI-H3-upscale-4K is installed."
     )
 
 
@@ -239,7 +240,7 @@ def _stage2_enhance(crops, engine, scale, cfg, steps, fidelity, blend, temporal)
     if crops is None or crops.shape[0] == 0:
         return crops, "stage2: skip (empty crops)"
     mod = _get_bsai_4k()
-    if engine == "VOSR 2.0 (CVPR2026生成式超分)":
+    if engine == "VOSR 2.0 (CVPR2026 generative upscale)":
         node = mod.BSAI_H3_Upscale4K()
         scale = max(1.0, float(scale))
         out, w, h, eff, info = node.upscale(**{
@@ -268,7 +269,7 @@ def _stage2_enhance(crops, engine, scale, cfg, steps, fidelity, blend, temporal)
     # ---- 快速超分档（FlashVSR / SeedVR2 INT8 / DLSS5 / RealESRGAN / 1x 模型）----
     model_name = _STAGE2_ENGINE_MODEL.get(engine)
     if model_name is None:
-        raise RuntimeError("未知第二阶段引擎: %s" % engine)
+        raise RuntimeError("Unknown stage-2 engine: %s" % engine)
     # 1x 模型 = 只修不放大；其余按用户 stage2_scale
     s = 1.0 if model_name.lower().startswith("1x") else max(1.0, float(scale))
     node = mod.BSAI_H3_Upscale4K()
@@ -288,10 +289,15 @@ def _stage2_enhance(crops, engine, scale, cfg, steps, fidelity, blend, temporal)
 
 
 def _detector_choices():
+    """Face detector combo options, sourced from folder_paths via the embedded H3 tracker.
+
+    Values are bare filenames (resolved by folder_paths.get_full_path at run time);
+    no arbitrary free-text path is accepted.
+    """
     try:
-        return _get_hfr()["H3FaceTrackCrop"].INPUT_TYPES()["required"]["detector"][0]
+        return list(_get_hfr()["H3FaceTrackCrop"].INPUT_TYPES()["required"]["detector"][0])
     except Exception:
-        return ["bbox\\face_yolov8m.pt", "bbox\\face_yolov8n.pt", "bbox\\face_yolov8s.pt", "bbox\\face_yolov9c.pt"]
+        return ["face_yolov8m.pt", "face_yolov8n.pt", "face_yolov8s.pt", "face_yolov9c.pt"]
 
 
 def _find_person_detector():
@@ -401,67 +407,66 @@ class BSAIFaceRefine:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "images": ("IMAGE", {"tooltip": "源视频帧序列（任意长度，建议完整帧率）"}),
-                "model": ("MODEL", {"tooltip": "MiniMax H3 视频模型（建议使用 TURBO 4 步 / 8 步模型）"}),
-                "clip": ("CLIP", {"tooltip": "H3 文本编码器（Qwen3VL-MiniMax-H3）"}),
-                "vae": ("VAE", {"tooltip": "H3 视频 VAE"}),
-                "audio_vae": ("VAE", {"tooltip": "H3 音频 VAE（启用音频锁定时必需）"}),
-                "detector": ("STRING", {"default": "bbox\\face_yolov8m.pt", "tooltip": "人脸检测模型（models/ultralytics/bbox 下）"}),
-                "steps": ("INT", {"default": 8, "min": 1, "max": 32, "step": 1, "tooltip": "H3 重绘采样步数（参考工作流 8 步）"}),
+                "images": ("IMAGE", {"tooltip": "Source video frames (any length; full frame rate recommended)"}),
+                "model": ("MODEL", {"tooltip": "MiniMax H3 video model (TURBO 4/8-step model recommended)"}),
+                "clip": ("CLIP", {"tooltip": "H3 text encoder (Qwen3VL-MiniMax-H3)"}),
+                "vae": ("VAE", {"tooltip": "H3 video VAE"}),
+                "audio_vae": ("VAE", {"tooltip": "H3 audio VAE (required when audio lock is enabled)"}),
+                "detector": (_detector_choices(), {"default": "face_yolov8m.pt",
+                                                   "tooltip": "Face detection model picked from models/ultralytics/bbox. Only files registered with folder_paths are selectable; free-text paths are not accepted."}),
+                "steps": ("INT", {"default": 8, "min": 1, "max": 32, "step": 1, "tooltip": "H3 redraw sampling steps (reference workflow uses 8)"}),
                 "denoise": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.0, "step": 0.05,
-                                      "tooltip": "人脸重绘强度（作用于大脸帧）。小脸帧自动用全强度（参考工作流语义：大脸 0.35、小脸 1.0）。崩坏严重可到 0.5~0.55"}),
+                                      "tooltip": "Face redraw strength applied to large-face frames. Small-face frames automatically use full strength (reference workflow: large face 0.35, small face 1.0). Raise to 0.5-0.55 for badly broken faces."}),
                 "canvas_size": ("INT", {"default": 768, "min": 512, "max": 2048, "step": 64,
-                                        "tooltip": "人脸裁剪画布尺寸（正方形）。768 为 H3 原生推荐；越大越清晰但越耗显存"}),
+                                        "tooltip": "Square face-crop canvas size. 768 is H3's native recommendation; larger is sharper but uses more VRAM"}),
                 "small_face_denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05,
-                                                 "tooltip": "小脸帧的重绘强度（参考工作流 1.0）。帧间按人脸大小平滑过渡"}),
+                                                 "tooltip": "Redraw strength for small-face frames (reference workflow 1.0). Smoothly interpolated by face size between frames"}),
                 "confidence": ("FLOAT", {"default": 0.35, "min": 0.05, "max": 1.0, "step": 0.05}),
                 "crop_factor": ("FLOAT", {"default": 2.5, "min": 1.2, "max": 6.0, "step": 0.1,
-                                          "tooltip": "人脸框外扩倍数，给重绘提供上下文"}),
+                                          "tooltip": "Expansion factor around the face box to give the redraw context"}),
                 "smooth_window": ("INT", {"default": 21, "min": 1, "max": 121, "step": 2,
-                                          "tooltip": "裁剪位置时域平滑窗口"}),
+                                          "tooltip": "Temporal smoothing window for crop position"}),
                 "scheduler": (["beta", "simple", "karras", "sgm_uniform", "exponential"], {"default": "beta"}),
                 "sampler_name": (["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde", "uni_pc", "heun"], {"default": "euler"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 2 ** 53 - 1, "step": 1}),
                 "prompt": ("STRING", {"default": _DEFAULT_PROMPT, "multiline": True,
-                                      "tooltip": "重绘提示词。默认是通用高清人像增强词，可自定义"}),
+                                      "tooltip": "Redraw prompt. Default is a generic HD portrait enhancement prompt; override as needed"}),
             },
             "optional": {
-                "audio": ("AUDIO", {"tooltip": "原视频音频（启用后用于口型/音频锁定，保持音画同步）"}),
-                "identity_ref_1": ("IMAGE", {"tooltip": "第 1 个人的身份参考图（单人修复可留空=自动跟踪最大脸）"}),
-                "identity_ref_2": ("IMAGE", {"tooltip": "第 2 个人的身份参考图（多人场景）"}),
-                "identity_ref_3": ("IMAGE", {"tooltip": "第 3 个人的身份参考图（多人场景）"}),
-                "identity_ref_4": ("IMAGE", {"tooltip": "第 4 个人的身份参考图（多人场景）"}),
-                "enable_audio_lock": ("BOOLEAN", {"default": True, "tooltip": "用原视频音频锁定口型（需 audio_vae + audio）"}),
+                "audio": ("AUDIO", {"tooltip": "Original video audio (used for lip/audio lock when enabled, keeps audio in sync)"}),
+                "identity_ref_1": ("IMAGE", {"tooltip": "Identity reference for person 1 (leave blank for single-person auto-largest-face tracking)"}),
+                "identity_ref_2": ("IMAGE", {"tooltip": "Identity reference for person 2 (multi-person)"}),
+                "identity_ref_3": ("IMAGE", {"tooltip": "Identity reference for person 3 (multi-person)"}),
+                "identity_ref_4": ("IMAGE", {"tooltip": "Identity reference for person 4 (multi-person)"}),
+                "enable_audio_lock": ("BOOLEAN", {"default": True, "tooltip": "Lock lip sync to the original video audio (requires audio_vae + audio)"}),
                 "identity_threshold": ("FLOAT", {"default": 0.28, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "paste_region": (["face_only", "face_ellipse", "full_crop"], {"default": "face_only"}),
                 "mask_dilation": ("INT", {"default": 24, "min": 0, "max": 256, "step": 2}),
                 "feather": ("INT", {"default": 24, "min": 0, "max": 256, "step": 2}),
                 "colour_match": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "blend": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05}),
-                # ---- 第二阶段（可选）：VOSR / CodeFormer 细节增强 ----
+                # ---- optional stage 2: VOSR / CodeFormer detail enhancement ----
                 "stage2_enable": ("BOOLEAN", {"default": False,
-                                              "tooltip": "开启第二阶段细节增强（复用本机 BSAI-H3-upscale-4K 引擎，对应参考视频的 VOSR2 环节）"}),
-                "stage2_engine": (_STAGE2_ENGINES, {"default": "1xSkinContrast (皮肤细节·极速)",
-                                                    "tooltip": "第二阶段引擎：快速档(1xSkinContrast皮肤细节/RealESRGAN/DLSS5/FlashVSR/SeedVR2-INT8)、极致档(VOSR生成式细节)或人脸重建(CodeFormer/GFPGAN)"}),
+                                              "tooltip": "Enable stage-2 detail enhancement (reuses the local BSAI-H3-upscale-4K engine; corresponds to the VOSR2 step in the reference video)"}),
+                "stage2_engine": (_STAGE2_ENGINES, {"default": "1xSkinContrast (skin detail, fastest)",
+                                                    "tooltip": "Stage-2 engine: fast tier (1xSkinContrast skin detail / RealESRGAN / DLSS5 / FlashVSR / SeedVR2-INT8), extreme tier (VOSR generative detail), or face restoration (CodeFormer / GFPGAN)"}),
                 "stage2_scale": ("FLOAT", {"default": 2.0, "min": 1.0, "max": 4.0, "step": 0.5,
-                                           "tooltip": "第二阶段采样倍率。1x 引擎(1xSkinContrast/1xDeJPG)自动固定 1 倍只修不放大；其余引擎按此倍率生成，缝合层按原坐标贴回。VOSR 最低 2 倍"}),
+                                           "tooltip": "Stage-2 sampling scale. 1x engines (1xSkinContrast / 1xDeJPG) are pinned to 1x repair-only; other engines generate at this scale and the stitch layer maps back to original coordinates. VOSR needs at least 2x"}),
                 "stage2_cfg": ("FLOAT", {"default": 0.5, "min": -2.0, "max": 2.0, "step": 0.1,
-                                         "tooltip": "VOSR / SeedVR2 保真度（越高越忠于原脸）"}),
+                                         "tooltip": "VOSR / SeedVR2 fidelity (higher = closer to the original face)"}),
                 "stage2_steps": ("INT", {"default": 1, "min": 1, "max": 25, "step": 1,
-                                         "tooltip": "VOSR 推理步数（1 = 一步生成最快；纹理不满意可到 2~4）"}),
+                                         "tooltip": "VOSR inference steps (1 = fastest single step; raise to 2-4 if texture is unsatisfactory)"}),
                 "stage2_fidelity": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05,
-                                              "tooltip": "CodeFormer 保真度（仅 CodeFormer 引擎使用）"}),
+                                              "tooltip": "CodeFormer fidelity (CodeFormer engine only)"}),
                 "stage2_blend": ("FLOAT", {"default": 0.7, "min": 0.1, "max": 1.0, "step": 0.05,
-                                           "tooltip": "CodeFormer 融合强度（仅 CodeFormer 引擎使用）"}),
+                                           "tooltip": "CodeFormer blend strength (CodeFormer engine only)"}),
                 "stage2_temporal": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05,
-                                              "tooltip": "人脸时域稳定（仅 CodeFormer 引擎使用）"}),
+                                              "tooltip": "Face temporal stability (CodeFormer engine only)"}),
                 "undetected_frames": (["fade_out", "skip", "composite_anyway"], {"default": "fade_out"}),
                 "person_fallback": ("BOOLEAN", {"default": False,
-                    "tooltip": "远景小脸兜底：仅当人脸检测器在某些帧彻底丢帧时，用 person 全身分割模型"
-                               "从人体框顶部反推头部。注意：它会参与轨迹平滑，中景/夜景镜头若估算偏低会把裁剪框拉偏到脖子导致噪点。"
-                               "建议默认关；只在确认纯远景小脸、且远景帧脸框频繁丢失时手动开。需 models/ultralytics/segm/person_yolov8m-seg.pt。"}),
+                    "tooltip": "Wide-shot small-face fallback: only on frames where the face detector completely loses the face, use the person whole-body segmentation model to back-derive the head from the top of the body box. Note: it participates in trajectory smoothing, so in medium/night shots a low estimate can drag the crop box onto the neck and cause noise. Off by default; enable only when you confirm pure wide-shot small faces with frequent lost face boxes. Requires models/ultralytics/segm/person_yolov8m-seg.pt."}),
                 "use_npu_face_detect": ("BOOLEAN", {"default": True,
-                    "tooltip": "启用 NPU 人脸检测：自动启动 NPU 服务(8191)，人脸检测/关键点/年龄识别跑在 Intel AI Boost NPU 上，不占 GPU"}),
+                    "tooltip": "Enable NPU face detection: auto-starts the NPU service (8191); face detection / landmarks / age recognition run on the Intel AI Boost NPU and do not use the GPU"}),
             },
         }
 
@@ -469,7 +474,7 @@ class BSAIFaceRefine:
     RETURN_NAMES = ("images", "report", "face_count")
     FUNCTION = "run"
     CATEGORY = "BSAI/H3 Face Refine"
-    DESCRIPTION = "一键修复视频人脸变形/崩坏/模糊，单人多人自动处理，输出高清人脸。"
+    DESCRIPTION = "One-click repair of deformed/broken/blurry faces in video; single and multi-person handled automatically, outputs high-definition faces."
 
     def run(
         self,
@@ -503,7 +508,7 @@ class BSAIFaceRefine:
         colour_match=1.0,
         blend=1.0,
         stage2_enable=False,
-        stage2_engine="1xSkinContrast (皮肤细节·极速)",
+        stage2_engine="1xSkinContrast (skin detail, fastest)",
         stage2_scale=2.0,
         stage2_cfg=0.5,
         stage2_steps=1,
@@ -565,7 +570,7 @@ class BSAIFaceRefine:
             _old_canvas = canvas_size
             canvas_size = max(512, int(canvas_size - 128))
             reports.append(
-                "[显存自动降档] 进入时仅剩 %.0fMB 显存，画布 %d -> %d，避免采样 OOM。"
+                "[VRAM auto-lower] Only %.0fMB VRAM free on entry; canvas %d -> %d to avoid sampling OOM."
                 % (_free_mb, _old_canvas, canvas_size)
             )
             print("[BSAIFaceRefine] VRAM 紧张自动降画布: %d -> %d" % (_old_canvas, canvas_size))
@@ -629,12 +634,12 @@ class BSAIFaceRefine:
                     except Exception:
                         pass
             if crops is None:
-                reports.append("[pass %d] 未检测到人脸，跳过。" % (pass_idx + 1))
+                reports.append("[pass %d] No face detected, skipping." % (pass_idx + 1))
                 continue
 
             face_count += 1
             reports.append(
-                "[pass %d] 人脸 %d 个：裁剪画布 %dx%d，帧数 %d\n%s"
+                "[pass %d] %d person(s): crop canvas %dx%d, frames %d\n%s"
                 % (pass_idx + 1, len(refs), cw, ch, K, (track_report or "")[:400])
             )
 
@@ -652,8 +657,8 @@ class BSAIFaceRefine:
                         if _face_h_big >= 30.0:
                             auto_ref = crops[_bk:_bk + 1]
                             reports.append(
-                                "[自动近景参考] 检测到近景大脸约 %.0fpx（裁剪帧 #%d），"
-                                "自动裁出作 ref2v 锚点，远景小脸不再凭空生成。" % (_face_h_big, _bk))
+                                "[auto near-shot ref] Detected a close-up face of about %.0fpx (crop frame #%d); "
+                                "auto-cropped as the ref2v anchor so wide-shot small faces are no longer generated from scratch." % (_face_h_big, _bk))
                 except Exception as _e:
                     print("[BSAIFaceRefine-v5] auto near-shot ref skipped:", _e)
 
@@ -666,8 +671,8 @@ class BSAIFaceRefine:
             if min_face is not None and min_face < 40.0 and canvas_size > 512:
                 _mag_old = canvas_size / (min_face * max(crop_factor, 1.0))
                 reports.append(
-                    "[小脸模式] 源脸高约 %.0fpx(<40px)，原放大 %.1fx 过大易致结构崩坏；"
-                    "自动改 512 画布 + crop_factor 3.5 降倍重裁。" % (min_face, _mag_old))
+                    "[small-face mode] Source face height about %.0fpx (<40px); the original %.1fx upscale is too large and risks structural collapse; "
+                    "auto-switched to a 512 canvas with crop_factor 3.5 for a re-crop." % (min_face, _mag_old))
                 crops, transform, preview, track_report, cw, ch, K = track.run(
                     images=base, detector=detector, confidence=confidence,
                     crop_factor=3.5, canvas_width=512, canvas_height=512,
@@ -680,13 +685,13 @@ class BSAIFaceRefine:
                 )
                 canvas_size = 512
                 _mag_new = 512.0 / (min_face * 3.5)
-                reports.append("[小脸模式] 重裁完成：画布 512x512，放大 %.1fx，帧数 %d。" % (_mag_new, K))
+                reports.append("[small-face mode] Re-crop done: 512x512 canvas, upscale %.1fx, frames %d." % (_mag_new, K))
                 # 源脸仅 23~33px 时，放大 5~6 倍后几乎无五官信息。denoise 0.4 会让 H3
                 # 自由重生成近半内容、在无参考图时发散成彩色噪点。压到 0.18：只做锐化/
                 # 纹理增强，保留原糊脸结构，杜绝噪点。脸稍大（40~120px）走正常 0.35。
                 _small_face_mode = True
                 _eff_small_denoise = 0.35
-                reports.append("[小脸模式] 小脸 denoise 0.35（配合自动近景参考锚点，正常重绘防噪点）。")
+                reports.append("[small-face mode] Small-face denoise 0.35 (with the auto near-shot anchor; normal redraw prevents noise).")
 
             # ---- 2. conditioning（可选身份参考注入） ---------------------------
             use_ref = ref if ref is not None else auto_ref
@@ -720,7 +725,7 @@ class BSAIFaceRefine:
             if audio is not None and enable_audio_lock and audio_lock_cls is not None:
                 active_model, latent, _ = audio_lock_cls().lock_audio(model, latent, audio_vae, audio)
             elif audio is None and enable_audio_lock:
-                reports.append("  [提示] 未连接 audio，音频锁定已跳过。")
+                reports.append("  [note] No audio connected; audio lock skipped.")
 
             # ---- 5. 按人脸大小逐帧调节 denoise --------------------------------
             # 官方 H3PerFrameDenoise 返回 (av_latent, report, model)——RETURN_TYPES 顺序。
@@ -747,7 +752,7 @@ class BSAIFaceRefine:
             _vram_budget_report("采样前", _used_mb, _free_mb, _total_mb, _ratio)
             if _free_mb < 1500:
                 reports.append(
-                    "[显存提示] 采样前仅剩 %.0fMB 显存，若采样报 OOM 请降低 canvas_size 或关闭其他驻留模型。"
+                    "[VRAM note] Only %.0fMB VRAM free before sampling; if sampling hits OOM, lower canvas_size or unload other resident models."
                     % _free_mb
                 )
             sigmas = BasicScheduler.execute(patched_model, scheduler, steps, 1.0).result[0]
@@ -778,9 +783,9 @@ class BSAIFaceRefine:
                         fidelity=stage2_fidelity, blend=stage2_blend,
                         temporal=stage2_temporal,
                     )
-                    reports.append("[pass %d] 第二阶段: %s" % (pass_idx + 1, s2_info))
+                    reports.append("[pass %d] Stage 2: %s" % (pass_idx + 1, s2_info))
                 except Exception as e:
-                    reports.append("[pass %d] 第二阶段失败（已跳过，保留 H3 重绘结果）: %s"
+                    reports.append("[pass %d] Stage 2 failed (skipped; H3 redraw result kept): %s"
                                    % (pass_idx + 1, e))
 
             # ---- 8. 羽化缝合回底图（多人时链式累积） ----------------------------
@@ -795,7 +800,7 @@ class BSAIFaceRefine:
                 blend=blend,
                 undetected_frames=undetected_frames,
             )
-            reports.append("[pass %d] 缝合完成。" % (pass_idx + 1))
+            reports.append("[pass %d] Stitch complete." % (pass_idx + 1))
 
         # ---- VRAM 收尾：卸载 VAE + 清缓存，释放给后续节点 ----
         _unload_vae(vae)
@@ -806,7 +811,7 @@ class BSAIFaceRefine:
 
         full_report = "\n".join(reports)
         if not reports:
-            full_report = "未检测到任何可修复的人脸。"
+            full_report = "No repairable faces detected."
         full_report = "[NPU] %s\n%s" % (npu_status, full_report)
         return (base, full_report, face_count)
 
@@ -816,5 +821,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "BSAIFaceRefine": "BSAI Face Refine (一键人脸高清修复)",
+    "BSAIFaceRefine": "BSAI Face Refine (one-click HD face repair)",
 }

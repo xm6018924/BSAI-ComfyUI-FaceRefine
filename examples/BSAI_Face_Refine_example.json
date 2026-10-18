@@ -354,7 +354,7 @@
         1.0,
         1.0,
         false,
-        "1xSkinContrast (皮肤细节·极速)",
+        "1xSkinContrast (skin detail, fastest)",
         2.0,
         0.5,
         1,
@@ -365,7 +365,7 @@
         false
       ],
       "widgets_values_named": {
-        "detector": "bbox\\face_yolov8m.pt",
+        "detector": "face_yolov8m.pt",
         "steps": 8,
         "denoise": 0.35,
         "canvas_size": 768,
@@ -385,7 +385,7 @@
         "feather": 24,
         "colour_match": 1,
         "blend": false,
-        "stage2_enable": "1xSkinContrast (皮肤细节·极速)",
+        "stage2_enable": "1xSkinContrast (skin detail, fastest)",
         "stage2_engine": 2,
         "stage2_scale": 0.5,
         "stage2_cfg": 1,
