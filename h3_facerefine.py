@@ -62,13 +62,6 @@ def _load_detector(name: str):
             path = None
         if path:
             break
-    if path is None:  # fall back to the standard models tree
-        base = getattr(folder_paths, "models_dir", "models")
-        for sub in ("ultralytics/bbox", "ultralytics", "ultralytics/segm"):
-            cand = os.path.join(base, *sub.split("/"), name)
-            if os.path.exists(cand):
-                path = cand
-                break
     if path is None:
         raise FileNotFoundError(
             f"Face detector '{name}' not found in ultralytics_bbox / ultralytics model folders."
