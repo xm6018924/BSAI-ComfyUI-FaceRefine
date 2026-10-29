@@ -421,6 +421,8 @@ class BSAIFaceRefine:
                                         "tooltip": "Square face-crop canvas size. 768 is H3's native recommendation; larger is sharper but uses more VRAM"}),
                 "small_face_denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05,
                                                  "tooltip": "Redraw strength for small-face frames (reference workflow 1.0). Smoothly interpolated by face size between frames"}),
+                "blur_face_threshold": ("FLOAT", {"default": 120.0, "min": 0.0, "max": 400.0, "step": 5.0,
+                                                  "tooltip": "Faces shorter than this many source pixels start to blur (reference video BV1wKn86VE6A: ~120px). When the smallest face in the clip falls below it and small_face_denoise is left at 1.0, the 40-120px band is automatically redrawn at 0.4 instead of interpolating above the large-face strength."}),
                 "confidence": ("FLOAT", {"default": 0.35, "min": 0.05, "max": 1.0, "step": 0.05}),
                 "crop_factor": ("FLOAT", {"default": 2.5, "min": 1.2, "max": 6.0, "step": 0.1,
                                           "tooltip": "Expansion factor around the face box to give the redraw context"}),
@@ -488,6 +490,7 @@ class BSAIFaceRefine:
         denoise,
         canvas_size,
         small_face_denoise,
+        blur_face_threshold,
         confidence,
         crop_factor,
         smooth_window,
@@ -596,6 +599,7 @@ class BSAIFaceRefine:
                 print("[BSAIFaceRefine-v5] NestedTensor 解码 + 远景小脸自动降倍已启用")
             _small_face_mode = False
             _eff_small_denoise = small_face_denoise
+            _face_px_small = 30.0
             # ---- 1. 检测 + 逐帧裁剪 + 身份跟踪 --------------------------------
             track = H3FaceTrackCrop()
             # BSAI 协同：人脸检测期间持有 NPU 租约（allocate 失败/未注册均不改变原流程）
@@ -687,11 +691,22 @@ class BSAIFaceRefine:
                 _mag_new = 512.0 / (min_face * 3.5)
                 reports.append("[small-face mode] Re-crop done: 512x512 canvas, upscale %.1fx, frames %d." % (_mag_new, K))
                 # 源脸仅 23~33px 时，放大 5~6 倍后几乎无五官信息。denoise 0.4 会让 H3
-                # 自由重生成近半内容、在无参考图时发散成彩色噪点。压到 0.18：只做锐化/
-                # 纹理增强，保留原糊脸结构，杜绝噪点。脸稍大（40~120px）走正常 0.35。
+                # 自由重生成近半内容、在无参考图时发散成彩色噪点。压到 0.35：只做锐化/
+                # 纹理增强，保留原糊脸结构，杜绝噪点。40~120px 的糊脸守卫见下方分支。
                 _small_face_mode = True
                 _eff_small_denoise = 0.35
                 reports.append("[small-face mode] Small-face denoise 0.35 (with the auto near-shot anchor; normal redraw prevents noise).")
+            elif min_face is not None and min_face < blur_face_threshold and small_face_denoise >= 1.0:
+                # 糊脸守卫（参考视频 BV1wKn86VE6A）：源脸 < ~120px 眼睛就开始糊、嘴部
+                # 变"烂肉"。默认插值下，40~120px 的中景脸强度在 1.0→0.35 之间过渡，
+                # 反而比大脸更猛。small_face_denoise 留在默认 1.0（未定制）时自动压到
+                # 0.4（作者实测 0.35~0.45 区间），40px 端 0.4 → 120px 端 0.35 平滑衔接。
+                _eff_small_denoise = 0.4
+                _face_px_small = 40.0
+                reports.append(
+                    "[blur guard] Smallest source face ~%.0fpx (< %.0fpx blur threshold, ref BV1wKn86VE6A); "
+                    "the 40-120px band now redraws at 0.4 instead of interpolating above the large-face strength. "
+                    "Set small_face_denoise below 1.0 to override." % (min_face, blur_face_threshold))
 
             # ---- 2. conditioning（可选身份参考注入） ---------------------------
             use_ref = ref if ref is not None else auto_ref
@@ -735,7 +750,7 @@ class BSAIFaceRefine:
                 transform,
                 denoise_multiplier_small_face=_eff_small_denoise,
                 denoise_multiplier_large_face=denoise,
-                face_px_small=30.0,
+                face_px_small=_face_px_small,
                 face_px_large=120.0,
                 gamma=1.0,
                 smooth_frames=9,

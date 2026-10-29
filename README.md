@@ -78,6 +78,7 @@ H3 Loader (model+CLIP+VAE+audioVAE) ─┘
 | `steps` | 8 | 采样步数 (official face workflow = 8) |
 | `denoise` | 0.35 | 大脸重绘强度 0.25–0.45；崩坏严重 0.5–0.55 |
 | `small_face_denoise` | 1.0 | 小脸初始强度（远景模式下实际被自动降到 0.4） |
+| `blur_face_threshold` | 120 | **糊脸临界**（参考视频 BV1wKn86VE6A）：剪辑内最小脸低于此值且 `small_face_denoise` 留在默认 1.0 时，40–120px 区间自动按 0.4 重绘（实测 0.35–0.45 区间），不再出现"中景脸比大脸重绘更猛"导致的糊脸 |
 | `canvas_size` | 768 | 裁剪画布；远景建议 512 |
 | `confidence` | 0.35 | 检测置信度 |
 | `crop_factor` | 2.5 | 人脸外扩倍数；远景建议 3.5 |
@@ -120,6 +121,8 @@ Wire one clear frontal portrait per person into `identity_ref_1..4`; the node ru
 
 ## 更新日志 / Changelog
 
+- **v5.1 (2026-10-29)**：新增 `blur_face_threshold`（默认 120，糊脸临界，来自 B 站 BV1wKn86VE6A"告别糊脸"教程）：剪辑内最小脸 < 120px 且 `small_face_denoise` 留在默认 1.0 时，40–120px 区间自动按 0.4 重绘（0.35–0.45 实测区间的中值），修复"中景脸在默认插值下拿到 0.35→1.0 过渡强度、反而比大脸更猛"导致的糊脸/烂肉；显式设置过 `small_face_denoise` 的用户不受影响。三个示例工作流已同步该参数。
+  Added `blur_face_threshold` (default 120, the blur threshold from reference video BV1wKn86VE6A): when the smallest face in the clip is below 120px and `small_face_denoise` is left at 1.0, the 40–120px band automatically redraws at 0.4 — previously those mid-shot frames interpolated between 1.0 and 0.35 and received stronger redraw than large faces, causing exactly the blur the tutorial describes. Users who explicitly set `small_face_denoise` are unaffected. Example workflows updated.
 - **v5 (2026-09-13)**：新增 `person_fallback`（person 全身模型兜底头部定位，解决远景小脸跟踪断裂/五官错位）；小脸 denoise 0.7→0.4（对齐视频实测 0.35–0.45）；新增远景专用示例 `BSAI_Face_Refine_longshot.json`。
 - v4.1 (2026-09-13)：NestedTensor 解码修复；远景小脸自动降倍（<40px → 512 画布 + crop_factor 3.5）。
 - v1.0 (2026-09-12)：首发。单人自动 + 多人链式、音频锁定、逐帧去噪，参数对齐官方人脸工作流。
